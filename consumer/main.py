@@ -17,6 +17,7 @@ def main():
         alert_json_format = json.loads(alert)
         print(f"Got an {alert_json_format['priority']} alert:")
         alert_json_format["insertion_time"] = datetime.now()
+        alert_json_format["timestamp"] = datetime.strptime(alert_json_format["timestamp"], "%Y-%m-%dT%H:%M:%S.%f")
         print(f"insertion_time: {alert_json_format['insertion_time']}")
         mongo_cnx.insert_alert(alert_json_format)
 
