@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: alerts-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secretpass
+      MONGO_INITDB_DATABASE: alert_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - alert-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/alert_db --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: alerts-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - alert-network
+
+  api:
+    build: analytics-api/.
+    container_name: analytics-api
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: "mongodb://admin:secretpass@mongo:27017"
+      MONGO_DB: alert_db
+      MONGO_COLLECTION: alerts
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    depends_on:
+      - mongo
+    networks:
+      - alert-network
+
+
+  producer:
+    build: producer/.
+    container_name: alert-producer
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    networks:
+      - alert-network
+
+  consumer:
+    build: consumer/.
+    container_name: alert-consumer
+    environment:
+      MONGO_URI: "mongodb://admin:secretpass@mongo:27017"
+      MONGO_DB: alert_db
+      MONGO_COLLECTION: alerts
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    depends_on:
+      - mongo
+    networks:
+      - alert-network
+
+volumes:
+  mongo_data:
+
+networks:
+  alert-network:
+    driver: bridge
